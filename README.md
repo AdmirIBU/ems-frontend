@@ -28,3 +28,12 @@
   - `VITE_API_URL=http://localhost:5000`
 
 - When running the Vite dev server (`npm run dev`) the `server.proxy` in `vite.config.ts` forwards `/api` calls to the backend automatically.
+
+### Courses
+- The frontend exposes a **All Courses** page (`/courses`) where logged-in users can create a course and enroll.
+- API calls used:
+  - `GET /api/courses` — list courses
+  - `POST /api/courses` — create (requires `Authorization: Bearer <token>`)
+  - `POST /api/courses/:id/enroll` — enroll (requires `Authorization`)
+
+- When running in Docker the frontend is served behind Nginx which proxies `/api` to the backend, so `VITE_API_URL` can point to `http://backend:5000` in `docker-compose.yml`.

@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Link } from 'react-router-dom'
 
 export function RegisterPage() {
   const navigate = useNavigate()
@@ -28,7 +30,20 @@ export function RegisterPage() {
       if (!res.ok) throw new Error('Registration failed')
       const data = await res.json()
       localStorage.setItem('token', data.token)
-      localStorage.setItem('user', JSON.stringify(data.user))
+      // Prefer hydrated user from /users/me so role is always correct.
+      try {
+        const meRes = await fetch(`${API_BASE}/api/users/me`, {
+          headers: { Authorization: `Bearer ${data.token}` },
+        })
+        if (meRes.ok) {
+          const me = await meRes.json()
+          localStorage.setItem('user', JSON.stringify(me))
+        } else {
+          localStorage.setItem('user', JSON.stringify(data.user))
+        }
+      } catch {
+        localStorage.setItem('user', JSON.stringify(data.user))
+      }
       navigate('/exams')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed')
@@ -38,7 +53,7 @@ export function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-muted/40 px-4">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Register</CardTitle>
@@ -46,37 +61,52 @@ export function RegisterPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            {error && <div className="text-sm text-red-600">{error}</div>}
-            <Input
-              type="text"
-              placeholder="Full Name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-            <Input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-            <Input
-              type="password"
-              placeholder="Password (min 6 chars)"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
+            {error && <div className="text-sm text-destructive">{error}</div>}
+
+            <div className="space-y-2">
+              <Label htmlFor="name">Full name</Label>
+              <Input
+                id="name"
+                type="text"
+                placeholder="Your name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="name@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="Min 6 characters"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Registering...' : 'Register'}
             </Button>
           </form>
-          <p className="mt-4 text-sm text-gray-600">
+          <p className="mt-4 text-sm text-muted-foreground">
             Already have an account?{' '}
-            <a href="/login" className="text-blue-600 hover:underline">
+            <Link to="/login" className="text-primary underline-offset-4 hover:underline">
               Login
-            </a>
+            </Link>
           </p>
         </CardContent>
       </Card>
