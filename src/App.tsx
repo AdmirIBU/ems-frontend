@@ -1,6 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { LoginPage } from './pages/LoginPage'
-import { RegisterPage } from './pages/RegisterPage'
 import { ExamsPage } from './pages/ExamsPage'
 import { HomePage } from './pages/HomePage'
 import { ProfilePage } from './pages/ProfilePage'
@@ -31,7 +30,7 @@ function App() {
       <StudentExamSessionGuard />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/register" element={<Navigate to="/login" replace />} />
         <Route path="/profile" element={<PrivateRoute><DashboardShell><ProfilePage /></DashboardShell></PrivateRoute>} />
         <Route path="/admin/users" element={<PrivateRoute><DashboardShell><AdminUsersPage /></DashboardShell></PrivateRoute>} />
         <Route path="/courses" element={<DashboardShell><CoursesAllPage /></DashboardShell>} />

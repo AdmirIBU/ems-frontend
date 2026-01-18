@@ -125,18 +125,82 @@ export function CoursePage() {
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
 
+  const [downloadingMaterialId, setDownloadingMaterialId] = useState<string | null>(null)
+  const [downloadError, setDownloadError] = useState('')
+
   const [shareEmails, setShareEmails] = useState('')
   const [sharing, setSharing] = useState(false)
   const [shareError, setShareError] = useState('')
+
+  // question UI state
+  const [showAddQuestion, setShowAddQuestion] = useState(false)
+  const [questionType, setQuestionType] = useState<'essay' | 'multiple-choice' | 'tf' | 'image-upload'>('essay')
+  const [questionContent, setQuestionContent] = useState('')
+  const [questionOptions, setQuestionOptions] = useState('')
+  const [questionPoints, setQuestionPoints] = useState<number | ''>(1)
+  const [questionCorrectChoice, setQuestionCorrectChoice] = useState('')
+  const [questionCorrectTf, setQuestionCorrectTf] = useState<'true' | 'false'>('true')
+  const [questionSaving, setQuestionSaving] = useState(false)
+  const [questionError, setQuestionError] = useState('')
+  const [questionSuccess, setQuestionSuccess] = useState('')
 
   const authHeaders = useMemo(
     () => ({ Authorization: `Bearer ${token ?? ''}` }),
     [token]
   )
 
+  const canManage = user?.role === 'professor' || user?.role === 'admin'
   const canUpload = user?.role === 'professor' || user?.role === 'admin'
   const canShare = user?.role === 'professor'
   const backTo = user?.role === 'admin' ? '/courses' : '/courses/my'
+
+  const addQuestion = async () => {
+    if (!id || !token) return
+    setQuestionSaving(true)
+    setQuestionError('')
+    setQuestionSuccess('')
+    try {
+      const body = { type: questionType, content: questionContent } as any
+      if (questionPoints !== '') body.points = Number(questionPoints)
+
+      if (questionType === 'multiple-choice') {
+        const opts = questionOptions
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+        body.options = opts
+        body.correctAnswer = questionCorrectChoice
+      }
+
+      if (questionType === 'tf') {
+        body.correctAnswer = questionCorrectTf === 'true'
+      }
+
+      const res = await fetch(`${API_BASE}/api/courses/${id}/questions`, {
+        method: 'POST',
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+
+      if (!res.ok) {
+        const txt = await res.text().catch(() => '')
+        throw new Error(txt || 'Failed to add question')
+      }
+
+      await res.json().catch(() => null)
+      setQuestionSuccess('Question added')
+      setQuestionContent('')
+      setQuestionOptions('')
+      setQuestionPoints(1)
+      setQuestionCorrectChoice('')
+      setQuestionCorrectTf('true')
+      setShowAddQuestion(false)
+    } catch (e) {
+      setQuestionError(e instanceof Error ? e.message : 'Failed to add question')
+    } finally {
+      setQuestionSaving(false)
+    }
+  }
 
   const grouped = useMemo(() => {
     const byKind: Record<'lecture' | 'lab' | 'video' | 'other', Material[]> = {
@@ -186,6 +250,53 @@ export function CoursePage() {
   }, [id])
 
   const downloadUrl = (materialId: string) => `${API_BASE}/api/courses/${id}/materials/${materialId}/download`
+
+  const openOrDownloadMaterial = async (m: Material) => {
+    if (!id || !token) return
+    setDownloadingMaterialId(m.id)
+    setDownloadError('')
+    try {
+      const res = await fetch(downloadUrl(m.id), {
+        headers: {
+          ...authHeaders,
+        },
+      })
+
+      if (!res.ok) {
+        const txt = await res.text().catch(() => '')
+        throw new Error(txt || 'Failed to download material')
+      }
+
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+
+      // Best-effort filename from header, else fallback to originalName
+      const disposition = res.headers.get('content-disposition') || ''
+      const match = disposition.match(/filename\*?=(?:UTF-8''|\")?([^;\"\n]+)/i)
+      const filename = decodeURIComponent((match?.[1] || m.originalName || m.title || 'material').replace(/\"/g, '').trim())
+
+      // Videos are nicer opened in a new tab; other files can download directly.
+      const shouldOpen = String(m.mimetype || '').toLowerCase().startsWith('video/') || m.kind === 'video'
+
+      if (shouldOpen) {
+        window.open(url, '_blank', 'noopener,noreferrer')
+        // Revoke later to avoid breaking playback
+        window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+      } else {
+        const a = document.createElement('a')
+        a.href = url
+        a.download = filename
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        URL.revokeObjectURL(url)
+      }
+    } catch (e) {
+      setDownloadError(e instanceof Error ? e.message : 'Failed to download material')
+    } finally {
+      setDownloadingMaterialId(null)
+    }
+  }
 
   const upload = async () => {
     if (!id || !token) return
@@ -294,8 +405,15 @@ export function CoursePage() {
               <CardHeader>
                 <CardTitle>{course.title}</CardTitle>
                 <CardDescription>
-                  {course.courseCode ? `${course.courseCode} — ` : ''}
-                  {course.description || '—'}
+                  {(() => {
+                    const code = (course.courseCode ?? '').trim()
+                    const desc = (course.description ?? '').trim()
+
+                    if (code && desc) return `${code} — ${desc}`
+                    if (code) return code
+                    if (desc) return desc
+                    return '—'
+                  })()}
                 </CardDescription>
               </CardHeader>
               {(course as any)?.syllabus?.path && (
@@ -338,6 +456,7 @@ export function CoursePage() {
                 <CardDescription>Lectures, labs, and video materials for this course.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
+                {downloadError && <div className="text-destructive">{downloadError}</div>}
                 {materials.length === 0 ? (
                   <div className="text-gray-600">No materials uploaded yet.</div>
                 ) : (
@@ -362,17 +481,24 @@ export function CoursePage() {
                                     {new Date(m.uploadedAt).toLocaleString()} • {(m.size / (1024 * 1024)).toFixed(1)} MB
                                   </div>
                                 </div>
-                                <a
-                                  className="text-blue-600 hover:underline"
-                                  href={downloadUrl(m.id)}
-                                  target="_blank"
-                                  rel="noreferrer"
+                                <Button
+                                  type="button"
+                                  variant="link"
+                                  className="px-0"
+                                  onClick={() => void openOrDownloadMaterial(m)}
+                                  disabled={downloadingMaterialId === m.id}
                                 >
                                   <span className="inline-flex items-center gap-1">
                                     <MaterialIcon kind={pickMaterialIcon(m)} />
-                                    <span>{m.mimetype.startsWith('video/') || m.kind === 'video' ? 'Open Video' : 'Open'}</span>
+                                    <span>
+                                      {downloadingMaterialId === m.id
+                                        ? 'Opening...'
+                                        : m.mimetype.startsWith('video/') || m.kind === 'video'
+                                          ? 'Open Video'
+                                          : 'Download'}
+                                    </span>
                                   </span>
-                                </a>
+                                </Button>
                               </div>
                             ))}
                           </div>
@@ -383,6 +509,161 @@ export function CoursePage() {
                 )}
               </CardContent>
             </Card>
+
+            {canManage && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Questions</CardTitle>
+                  <CardDescription>Add questions for exams in this course.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  {questionError && <div className="text-destructive">{questionError}</div>}
+                  {questionSuccess && <div className="text-green-700">{questionSuccess}</div>}
+
+                  {showAddQuestion ? (
+                    <form
+                      className="space-y-3"
+                      onSubmit={(e) => {
+                        e.preventDefault()
+                        void addQuestion()
+                      }}
+                    >
+                      <div className="grid gap-2">
+                        <Label className="text-xs text-muted-foreground">Type</Label>
+                        <select
+                          className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                          value={questionType}
+                          onChange={(e) => {
+                            const next = e.target.value as any
+                            setQuestionType(next)
+                            setQuestionError('')
+                            setQuestionSuccess('')
+                          }}
+                        >
+                          <option value="essay">Essay</option>
+                          <option value="multiple-choice">Multiple choice</option>
+                          <option value="tf">True / False</option>
+                          <option value="image-upload">Image upload</option>
+                        </select>
+                      </div>
+
+                      <div className="grid gap-2">
+                        <Label className="text-xs text-muted-foreground">Content</Label>
+                        <Input
+                          value={questionContent}
+                          onChange={(e) => setQuestionContent(e.target.value)}
+                          placeholder="Question content"
+                          required
+                        />
+                      </div>
+
+                      <div className="grid gap-2">
+                        <Label className="text-xs text-muted-foreground">Points</Label>
+                        <Input
+                          value={questionPoints}
+                          onChange={(e) => setQuestionPoints(e.target.value ? Number(e.target.value) : '')}
+                          type="number"
+                          min={1}
+                          required
+                        />
+                      </div>
+
+                      {questionType === 'multiple-choice' && (
+                        <div className="space-y-3">
+                          <div className="grid gap-2">
+                            <Label className="text-xs text-muted-foreground">Options</Label>
+                            <Input
+                              value={questionOptions}
+                              onChange={(e) => {
+                                const next = e.target.value
+                                setQuestionOptions(next)
+
+                                const opts = next
+                                  .split(',')
+                                  .map((s) => s.trim())
+                                  .filter(Boolean)
+
+                                if (opts.length === 0) {
+                                  setQuestionCorrectChoice('')
+                                } else if (!opts.includes(questionCorrectChoice)) {
+                                  setQuestionCorrectChoice(opts[0])
+                                }
+                              }}
+                              placeholder="Options (comma separated)"
+                              required
+                            />
+                          </div>
+
+                          <div className="grid gap-2">
+                            <Label className="text-xs text-muted-foreground">Correct answer</Label>
+                            <select
+                              className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                              value={questionCorrectChoice}
+                              onChange={(e) => setQuestionCorrectChoice(e.target.value)}
+                              required
+                            >
+                              {questionOptions
+                                .split(',')
+                                .map((s) => s.trim())
+                                .filter(Boolean)
+                                .map((opt) => (
+                                  <option key={opt} value={opt}>
+                                    {opt}
+                                  </option>
+                                ))}
+                            </select>
+                          </div>
+                        </div>
+                      )}
+
+                      {questionType === 'tf' && (
+                        <div className="flex gap-4 text-sm">
+                          <label className="flex items-center gap-2">
+                            <input
+                              type="radio"
+                              name="correct-tf"
+                              checked={questionCorrectTf === 'true'}
+                              onChange={() => setQuestionCorrectTf('true')}
+                            />
+                            Correct = True
+                          </label>
+                          <label className="flex items-center gap-2">
+                            <input
+                              type="radio"
+                              name="correct-tf"
+                              checked={questionCorrectTf === 'false'}
+                              onChange={() => setQuestionCorrectTf('false')}
+                            />
+                            Correct = False
+                          </label>
+                        </div>
+                      )}
+
+                      <div className="flex gap-2">
+                        <Button type="submit" disabled={questionSaving}>
+                          {questionSaving ? 'Adding...' : 'Add Question'}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setShowAddQuestion(false)
+                            setQuestionError('')
+                          }}
+                          disabled={questionSaving}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </form>
+                  ) : (
+                    <Button type="button" onClick={() => setShowAddQuestion(true)}>
+                      Add Question
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             {canUpload && (
               <Card>

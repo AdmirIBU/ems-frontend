@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 type AdminUser = {
   id: string
@@ -10,6 +11,16 @@ type AdminUser = {
   role: 'student' | 'professor' | 'admin'
   createdAt?: string
 }
+
+type UsersResponse =
+  | AdminUser[]
+  | {
+      items: AdminUser[]
+      total: number
+      page: number
+      limit: number
+      totalPages: number
+    }
 
 export function AdminUsersPage() {
   const API_BASE = import.meta.env.VITE_API_URL ?? ''
@@ -25,6 +36,11 @@ export function AdminUsersPage() {
   const [role, setRole] = useState<'student' | 'professor'>('student')
   const [creating, setCreating] = useState(false)
 
+  const PAGE_SIZE = 10
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+
   const authHeaders = useMemo(() => {
     return {
       Authorization: `Bearer ${token ?? ''}`,
@@ -32,16 +48,28 @@ export function AdminUsersPage() {
     }
   }, [token])
 
-  const loadUsers = async () => {
+  const loadUsers = async (pageToLoad: number) => {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch(`${API_BASE}/api/admin/users`, {
+      const res = await fetch(`${API_BASE}/api/admin/users?page=${pageToLoad}&limit=${PAGE_SIZE}`, {
         headers: { Authorization: `Bearer ${token ?? ''}` },
       })
       if (!res.ok) throw new Error('Failed to load users')
-      const data = await res.json()
-      setUsers(Array.isArray(data) ? data : [])
+      const data = (await res.json()) as UsersResponse
+
+      if (Array.isArray(data)) {
+        // Backward-compatible fallback (if server returns a plain array)
+        setUsers(data)
+        setTotal(data.length)
+        setTotalPages(Math.max(1, Math.ceil(data.length / PAGE_SIZE)))
+        setPage(1)
+      } else {
+        setUsers(Array.isArray(data.items) ? data.items : [])
+        setTotal(Number(data.total ?? 0) || 0)
+        setTotalPages(Math.max(1, Number(data.totalPages ?? 1) || 1))
+        setPage(Number(data.page ?? pageToLoad) || pageToLoad)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load users')
     } finally {
@@ -50,9 +78,13 @@ export function AdminUsersPage() {
   }
 
   useEffect(() => {
-    void loadUsers()
+    void loadUsers(1)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const pageSafe = Math.min(Math.max(1, page), totalPages)
+  const startIndex = total === 0 ? 0 : (pageSafe - 1) * PAGE_SIZE
+  const endIndexExclusive = Math.min(startIndex + users.length, total)
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -94,7 +126,8 @@ export function AdminUsersPage() {
       setEmail('')
       setPassword('')
       setRole('student')
-      await loadUsers()
+      setPage(1)
+      await loadUsers(1)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create user')
     } finally {
@@ -113,27 +146,55 @@ export function AdminUsersPage() {
           <CardContent>
             <form onSubmit={handleCreate} className="space-y-3">
               {error && <div className="text-sm text-red-600">{error}</div>}
-              <Input placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} required />
-              <Input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-              <Input
-                type="password"
-                placeholder="Temporary password (min 6 chars)"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                minLength={6}
-                required
-              />
-              <label className="block text-sm">
-                Role
+              <div className="grid gap-2">
+                <Label htmlFor="admin-create-name">Full name</Label>
+                <Input
+                  id="admin-create-name"
+                  placeholder="Full name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="admin-create-email">Email</Label>
+                <Input
+                  id="admin-create-email"
+                  type="email"
+                  placeholder="Email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="admin-create-password">Temporary password</Label>
+                <Input
+                  id="admin-create-password"
+                  type="password"
+                  placeholder="Temporary password (min 6 chars)"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  minLength={6}
+                  required
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="admin-create-role">Role</Label>
                 <select
-                  className="mt-1 w-full border rounded px-3 py-2 text-sm"
+                  id="admin-create-role"
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   value={role}
                   onChange={(e) => setRole(e.target.value as 'student' | 'professor')}
                 >
                   <option value="student">Student</option>
                   <option value="professor">Professor</option>
                 </select>
-              </label>
+              </div>
+
               <Button type="submit" className="w-full" disabled={creating}>
                 {creating ? 'Creating...' : 'Create User'}
               </Button>
@@ -148,18 +209,76 @@ export function AdminUsersPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              <Button type="button" variant="outline" onClick={() => void loadUsers()} disabled={loading}>
-                Refresh
-              </Button>
-              <div className="space-y-2">
-                {users.map((u) => (
-                  <div key={u.id} className="border rounded p-3 text-sm">
-                    <div className="font-medium">{u.name}</div>
-                    <div className="text-gray-600">{u.email}</div>
-                    <div className="text-gray-600">Role: {u.role}</div>
-                  </div>
-                ))}
-                {!loading && users.length === 0 && <div className="text-sm text-gray-600">No users found.</div>}
+              <div className="flex items-center justify-between gap-2">
+                <Button type="button" variant="outline" onClick={() => void loadUsers(pageSafe)} disabled={loading}>
+                  Refresh
+                </Button>
+
+                <div className="text-xs text-muted-foreground">
+                  {total === 0 ? 'Showing 0 of 0' : `Showing ${startIndex + 1}–${endIndexExclusive} of ${total}`}
+                </div>
+              </div>
+
+              {error ? <div className="text-sm text-red-600">{error}</div> : null}
+
+              <div className="overflow-x-auto rounded-md border border-border">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/40">
+                    <tr className="border-b border-border">
+                      <th className="px-3 py-2 text-left font-medium">Name</th>
+                      <th className="px-3 py-2 text-left font-medium">Email</th>
+                      <th className="px-3 py-2 text-left font-medium">Role</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {users.map((u) => (
+                      <tr key={u.id}>
+                        <td className="px-3 py-2 font-medium">{u.name}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{u.email}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{u.role}</td>
+                      </tr>
+                    ))}
+                    {!loading && users.length === 0 && (
+                      <tr>
+                        <td colSpan={3} className="px-3 py-6 text-center text-sm text-muted-foreground">
+                          No users found.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex items-center justify-between gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    const nextPage = Math.max(1, pageSafe - 1)
+                    setPage(nextPage)
+                    void loadUsers(nextPage)
+                  }}
+                  disabled={loading || pageSafe <= 1}
+                >
+                  Previous
+                </Button>
+
+                <div className="text-xs text-muted-foreground">
+                  Page {pageSafe} of {totalPages}
+                </div>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    const nextPage = Math.min(totalPages, pageSafe + 1)
+                    setPage(nextPage)
+                    void loadUsers(nextPage)
+                  }}
+                  disabled={loading || pageSafe >= totalPages}
+                >
+                  Next
+                </Button>
               </div>
             </div>
           </CardContent>

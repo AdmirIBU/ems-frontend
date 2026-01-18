@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 type Course = {
   _id: string
@@ -44,15 +45,6 @@ export function CoursesAllPage() {
   const [assigningFor, setAssigningFor] = useState<string | null>(null)
   const [selectedProfessorIds, setSelectedProfessorIds] = useState<string[]>([])
   const [savingProfessors, setSavingProfessors] = useState(false)
-
-  // question UI state
-  const [showQuestionFor, setShowQuestionFor] = useState<string | null>(null)
-  const [questionType, setQuestionType] = useState<'essay' | 'multiple-choice' | 'tf' | 'image-upload'>('essay')
-  const [questionContent, setQuestionContent] = useState('')
-  const [questionOptions, setQuestionOptions] = useState('')
-  const [questionPoints, setQuestionPoints] = useState<number | ''>(1)
-  const [questionCorrectChoice, setQuestionCorrectChoice] = useState('')
-  const [questionCorrectTf, setQuestionCorrectTf] = useState<'true' | 'false'>('true')
 
   // edit course UI state
   const [editingCourseId, setEditingCourseId] = useState<string | null>(null)
@@ -330,27 +322,59 @@ export function CoursesAllPage() {
               const isEditing = editingCourseId === c._id
 
               return (
-                <div key={c._id} className="bg-white border rounded p-4 flex items-start justify-between gap-4">
-                  <div>
-                    <h2 className="font-semibold">
-                      {c.title} <span className="text-xs text-gray-400">({(c as any).courseCode})</span>
-                    </h2>
-                    {c.description && <p className="text-sm text-gray-600">{c.description}</p>}
-                    <p className="text-xs text-gray-500 mt-2">Students: {c.students?.length ?? 0}</p>
-                    {(c as any).syllabus?.path && (
-                      <p className="text-xs mt-2">
-                        <a href={(c as any).syllabus.path} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">Download syllabus</a>
-                      </p>
-                    )}
+                <Card key={c._id} className="w-full">
+                  <CardHeader className="p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <CardTitle className="text-base">
+                          <span className="truncate">{c.title}</span>{' '}
+                          {(c as any).courseCode ? (
+                            <span className="text-xs text-muted-foreground">({String((c as any).courseCode)})</span>
+                          ) : null}
+                        </CardTitle>
+                        {c.description ? <CardDescription className="mt-1">{c.description}</CardDescription> : null}
 
-                    <div className="mt-3 flex gap-2">
-                      <Button type="button" variant="outline" onClick={() => navigate(`/courses/${c._id}`)}>
-                        Open course
-                      </Button>
+                        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                          <span>Students: {c.students?.length ?? 0}</span>
+                          {typeof (c as any).ects === 'number' ? <span>ECTS: {(c as any).ects}</span> : null}
+                        </div>
+
+                        {(c as any).syllabus?.path ? (
+                          <div className="mt-2 text-xs">
+                            <a
+                              href={(c as any).syllabus.path}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-primary hover:underline"
+                            >
+                              Download syllabus
+                            </a>
+                          </div>
+                        ) : null}
+                      </div>
+
+                      <div className="flex shrink-0 flex-wrap items-center gap-2">
+                        <Button type="button" variant="outline" onClick={() => navigate(`/courses/${c._id}`)}>
+                          Open course
+                        </Button>
+
+                        {role === 'student' && (
+                          <Button
+                            onClick={() => handleEnroll(c._id)}
+                            disabled={enrolled || requested}
+                            aria-disabled={enrolled || requested}
+                            className={enrolled || requested ? 'opacity-50 cursor-not-allowed' : ''}
+                          >
+                            {enrolled ? 'Enrolled' : requested ? 'Requested' : 'Request enrollment'}
+                          </Button>
+                        )}
+                      </div>
                     </div>
+                  </CardHeader>
 
+                  <CardContent className="p-4 pt-0">
                     {role === 'admin' && (
-                      <div className="mt-4 border rounded p-3 bg-gray-50">
+                      <div className="mt-2 w-full rounded-md border border-border bg-muted/40 p-3">
                         <div className="flex items-center justify-between gap-2">
                           <div className="text-sm font-semibold">Assigned professors</div>
                           {assigningFor === c._id ? (
@@ -372,7 +396,7 @@ export function CoursesAllPage() {
                         {assigningFor === c._id ? (
                           <div className="mt-3 grid gap-2">
                             {professors.length === 0 ? (
-                              <div className="text-xs text-gray-600">No professors found.</div>
+                              <div className="text-xs text-muted-foreground">No professors found.</div>
                             ) : (
                               professors.map((p) => {
                                 const checked = selectedProfessorIds.includes(p.id)
@@ -389,16 +413,16 @@ export function CoursesAllPage() {
                                       }}
                                     />
                                     <span className="font-medium">{p.name}</span>
-                                    <span className="text-gray-600 text-xs">({p.email})</span>
+                                    <span className="text-muted-foreground text-xs">({p.email})</span>
                                   </label>
                                 )
                               })
                             )}
                           </div>
                         ) : (
-                          <div className="mt-2 text-sm text-gray-700">
+                          <div className="mt-2 text-sm">
                             {(c.professors ?? []).length === 0 ? (
-                              <span className="text-gray-600">No professors assigned.</span>
+                              <span className="text-muted-foreground">No professors assigned.</span>
                             ) : (
                               (c.professors ?? []).map((p) => p.name ?? p.email ?? p._id).join(', ')
                             )}
@@ -408,7 +432,7 @@ export function CoursesAllPage() {
                     )}
 
                     {canManage && (
-                      <div className="mt-3 flex gap-2">
+                      <div className="mt-4 flex flex-wrap gap-2">
                         {isEditing ? (
                           <>
                             <Button type="button" variant="outline" onClick={() => setEditingCourseId(null)}>
@@ -458,7 +482,7 @@ export function CoursesAllPage() {
                             const sid = typeof r?.student === 'string' ? r.student : r?.student?._id ?? r?.student?.id
                             const name = typeof r?.student === 'string' ? r.student : r?.student?.name ?? r?.student?.email ?? 'Student'
                             return (
-                              <div key={sid} className="flex items-center justify-between gap-2 border rounded p-2 bg-gray-50">
+                              <div key={sid} className="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/40 p-2">
                                 <div className="text-sm">{name}</div>
                                 <div className="flex gap-2">
                                   <Button type="button" className="text-sm" onClick={() => handleApprove(c._id, sid)}>
@@ -474,159 +498,8 @@ export function CoursesAllPage() {
                         </div>
                       </div>
                     )}
-
-                    {canManage && showQuestionFor === c._id ? (
-                      <form
-                        className="mt-3 space-y-2"
-                        onSubmit={async (e) => {
-                          e.preventDefault()
-                          if (!token) return alert('Please log in to add questions')
-                          try {
-                            const body = { type: questionType, content: questionContent } as any
-                            if (questionPoints !== '') body.points = Number(questionPoints)
-
-                            if (questionType === 'multiple-choice') {
-                              const opts = questionOptions.split(',').map((s) => s.trim()).filter(Boolean)
-                              body.options = opts
-                              body.correctAnswer = questionCorrectChoice
-                            }
-                            if (questionType === 'tf') {
-                              body.correctAnswer = questionCorrectTf === 'true'
-                            }
-                            const res = await fetch(`${API_BASE}/api/courses/${c._id}/questions`, {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                              body: JSON.stringify(body),
-                            })
-                            if (!res.ok) throw new Error('Failed to add question')
-                            await res.json()
-                            showToast('Question added')
-                            setQuestionContent('')
-                            setQuestionOptions('')
-                            setQuestionPoints(1)
-                            setQuestionCorrectChoice('')
-                            setQuestionCorrectTf('true')
-                            setShowQuestionFor(null)
-                          } catch (err) {
-                            console.error(err)
-                            alert('Add question failed')
-                          }
-                        }}
-                      >
-                        <div className="flex gap-2">
-                          <select value={questionType} onChange={(e) => setQuestionType(e.target.value as any)} className="border rounded p-2">
-                            <option value="essay">Essay</option>
-                            <option value="multiple-choice">Multiple choice</option>
-                            <option value="tf">True / False</option>
-                            <option value="image-upload">Image upload</option>
-                          </select>
-                          <input value={questionContent} onChange={(e) => setQuestionContent(e.target.value)} placeholder="Question content" className="flex-1 border rounded p-2" required />
-                        </div>
-
-                        <div className="flex gap-2">
-                          <input
-                            value={questionPoints}
-                            onChange={(e) => setQuestionPoints(e.target.value ? Number(e.target.value) : '')}
-                            type="number"
-                            min={1}
-                            placeholder="Points"
-                            className="w-32 border rounded p-2"
-                            required
-                          />
-                        </div>
-
-                        {questionType === 'multiple-choice' && (
-                          <div className="space-y-2">
-                            <input
-                              value={questionOptions}
-                              onChange={(e) => {
-                                const next = e.target.value
-                                setQuestionOptions(next)
-
-                                const opts = next.split(',').map((s) => s.trim()).filter(Boolean)
-                                // keep correct choice valid when options change
-                                if (opts.length === 0) {
-                                  setQuestionCorrectChoice('')
-                                } else if (!opts.includes(questionCorrectChoice)) {
-                                  setQuestionCorrectChoice(opts[0])
-                                }
-                              }}
-                              placeholder="Options (comma separated)"
-                              className="w-full border rounded p-2"
-                              required
-                            />
-
-                            <label className="block text-sm">
-                              Correct answer
-                              <select
-                                className="mt-1 w-full border rounded p-2 text-sm"
-                                value={questionCorrectChoice}
-                                onChange={(e) => setQuestionCorrectChoice(e.target.value)}
-                                required
-                              >
-                                {questionOptions
-                                  .split(',')
-                                  .map((s) => s.trim())
-                                  .filter(Boolean)
-                                  .map((opt) => (
-                                    <option key={opt} value={opt}>
-                                      {opt}
-                                    </option>
-                                  ))}
-                              </select>
-                            </label>
-                          </div>
-                        )}
-
-                        {questionType === 'tf' && (
-                          <div className="flex gap-4 text-sm">
-                            <label className="flex items-center gap-2">
-                              <input
-                                type="radio"
-                                name={`correct-${c._id}`}
-                                checked={questionCorrectTf === 'true'}
-                                onChange={() => setQuestionCorrectTf('true')}
-                              />
-                              Correct = True
-                            </label>
-                            <label className="flex items-center gap-2">
-                              <input
-                                type="radio"
-                                name={`correct-${c._id}`}
-                                checked={questionCorrectTf === 'false'}
-                                onChange={() => setQuestionCorrectTf('false')}
-                              />
-                              Correct = False
-                            </label>
-                          </div>
-                        )}
-                        <div className="flex gap-2">
-                          <Button type="submit" className="mt-2">Add Question</Button>
-                          <Button type="button" variant="outline" className="mt-2" onClick={() => setShowQuestionFor(null)}>Cancel</Button>
-                        </div>
-                      </form>
-                    ) : (
-                      canManage ? (
-                        <div className="mt-3">
-                          <Button onClick={() => setShowQuestionFor(c._id)} className="text-sm">Add Question</Button>
-                        </div>
-                      ) : null
-                    )}
-
-                  </div>
-                  <div>
-                    {role === 'student' && (
-                      <Button
-                        onClick={() => handleEnroll(c._id)}
-                        disabled={enrolled || requested}
-                        aria-disabled={enrolled || requested}
-                        className={enrolled || requested ? 'opacity-50 cursor-not-allowed' : ''}
-                      >
-                        {enrolled ? 'Enrolled' : requested ? 'Requested' : 'Request enrollment'}
-                      </Button>
-                    )}
-                  </div>
-                </div>
+                  </CardContent>
+                </Card>
               )
             })
           )}

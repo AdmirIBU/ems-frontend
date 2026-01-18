@@ -193,9 +193,6 @@ export default function Navbar() {
                 <Link to="/login" className="text-sm px-3 py-2 rounded hover:bg-gray-100">
                   Login
                 </Link>
-                <Link to="/register" className="text-sm px-3 py-2 rounded hover:bg-gray-100">
-                  Register
-                </Link>
               </div>
             )}
           </div>

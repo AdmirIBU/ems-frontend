@@ -2,14 +2,26 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --no-audit --no-fund
+ENV \
+	npm_config_fetch_retries=5 \
+	npm_config_fetch_retry_mintimeout=20000 \
+	npm_config_fetch_retry_maxtimeout=120000 \
+	npm_config_network_timeout=600000
+
+# Install devDependencies so `tsc` exists during the build
+RUN --mount=type=cache,target=/root/.npm \
+	npm ci --include=dev --no-audit --no-fund
 COPY . .
 RUN npm run build
 
-# Serve with nginx
-FROM nginx:stable-alpine AS runner
-COPY --from=builder /app/dist /usr/share/nginx/html
-# Custom nginx config to support SPA routing
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Serve with a tiny Node static server + reverse proxy
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production \
+	PORT=80 \
+	API_PROXY_TARGET=http://backend:5000
+
+COPY --from=builder /app/dist ./dist
+COPY server.mjs ./server.mjs
 EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["node", "server.mjs"]

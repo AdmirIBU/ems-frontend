@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 type ReviewAnswer = {
   question: {
     id: string
-    type?: 'essay' | 'multiple-choice' | 'tf'
+    type?: 'essay' | 'multiple-choice' | 'tf' | 'image-upload'
     content?: string
     options?: string[]
     correctAnswer?: any
@@ -47,7 +47,7 @@ export function AttemptReviewPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
-  const [essayPoints, setEssayPoints] = useState<Record<string, number>>({})
+  const [manualPoints, setManualPoints] = useState<Record<string, number>>({})
   const [responding, setResponding] = useState(false)
   const [responseMessage, setResponseMessage] = useState('')
   const [appointmentLocal, setAppointmentLocal] = useState('')
@@ -85,11 +85,11 @@ export function AttemptReviewPage() {
 
       const init: Record<string, number> = {}
       for (const a of payload.answers) {
-        if (a.question?.type === 'essay') {
+        if (a.question?.type === 'essay' || a.question?.type === 'image-upload') {
           init[a.question.id] = a.pointsAwarded ?? 0
         }
       }
-      setEssayPoints(init)
+      setManualPoints(init)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load review')
     } finally {
@@ -114,7 +114,7 @@ export function AttemptReviewPage() {
           ...authHeaders,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ pointsByQuestion: essayPoints }),
+        body: JSON.stringify({ pointsByQuestion: manualPoints }),
       })
       if (!res.ok) {
         const txt = await res.text().catch(() => '')
@@ -272,9 +272,54 @@ export function AttemptReviewPage() {
                             type="number"
                             min={0}
                             max={a.maxPoints}
-                            value={essayPoints[a.question.id] ?? 0}
+                            value={manualPoints[a.question.id] ?? 0}
                             onChange={(e) =>
-                              setEssayPoints((prev) => ({ ...prev, [a.question.id]: Number(e.target.value) }))
+                              setManualPoints((prev) => ({ ...prev, [a.question.id]: Number(e.target.value) }))
+                            }
+                            className="w-28"
+                          />
+                          <span className="text-gray-600">/ {a.maxPoints}</span>
+                        </div>
+                      </>
+                    )}
+
+                    {a.question.type === 'image-upload' && (
+                      <>
+                        <div>
+                          <strong>Student upload:</strong>
+                          <div className="mt-2 border rounded p-2 bg-white space-y-2">
+                            {a.answer && typeof a.answer === 'object' && a.answer.path ? (
+                              <>
+                                <a
+                                  className="text-blue-600 hover:underline"
+                                  href={`${API_BASE}${a.answer.path}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  Open uploaded image
+                                </a>
+                                <img
+                                  src={`${API_BASE}${a.answer.path}`}
+                                  alt="Uploaded answer"
+                                  className="max-h-80 w-auto rounded border"
+                                  loading="lazy"
+                                />
+                              </>
+                            ) : (
+                              <span>{String(a.answer ?? '')}</span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">Points:</span>
+                          <Input
+                            type="number"
+                            min={0}
+                            max={a.maxPoints}
+                            value={manualPoints[a.question.id] ?? 0}
+                            onChange={(e) =>
+                              setManualPoints((prev) => ({ ...prev, [a.question.id]: Number(e.target.value) }))
                             }
                             className="w-28"
                           />

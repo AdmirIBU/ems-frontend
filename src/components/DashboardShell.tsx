@@ -135,9 +135,6 @@ export function DashboardShell({ children }: { children: ReactNode }) {
                 <Link to="/login">
                   <Button variant="secondary" size="sm">Login</Button>
                 </Link>
-                <Link to="/register">
-                  <Button variant="ghost" size="sm">Register</Button>
-                </Link>
               </div>
             )}
           </div>
@@ -180,7 +177,6 @@ export function DashboardShell({ children }: { children: ReactNode }) {
               ) : (
                 <div className="flex items-center gap-2">
                   <Link to="/login"><Button variant="secondary" size="sm">Login</Button></Link>
-                  <Link to="/register"><Button variant="ghost" size="sm">Register</Button></Link>
                 </div>
               )}
             </div>

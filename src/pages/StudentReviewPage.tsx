@@ -8,7 +8,6 @@ type StudentListItem = {
   id: string
   name: string
   email: string
-  role?: string
   createdAt?: string
 }
 
@@ -134,7 +133,6 @@ export function StudentReviewPage() {
                   <tr className="text-left border-b">
                     <th className="py-2">Name</th>
                     <th className="py-2">Email</th>
-                    <th className="py-2">Role</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -150,20 +148,19 @@ export function StudentReviewPage() {
                     >
                       <td className="py-2 font-medium">{s.name}</td>
                       <td className="py-2">{s.email}</td>
-                      <td className="py-2">{s.role ?? 'student'}</td>
                     </tr>
                   ))}
 
                   {!studentsLoading && students.length === 0 && (
                     <tr>
-                      <td className="py-3 text-gray-600" colSpan={3}>
+                      <td className="py-3 text-gray-600" colSpan={2}>
                         No students found.
                       </td>
                     </tr>
                   )}
                   {studentsLoading && (
                     <tr>
-                      <td className="py-3 text-gray-600" colSpan={3}>
+                      <td className="py-3 text-gray-600" colSpan={2}>
                         Loading students...
                       </td>
                     </tr>
@@ -196,11 +193,7 @@ export function StudentReviewPage() {
                 <CardTitle>{data.student.name}</CardTitle>
                 <CardDescription>{data.student.email}</CardDescription>
               </CardHeader>
-              <CardContent className="text-sm">
-                <div>
-                  <strong>Role:</strong> {data.student.role ?? 'student'}
-                </div>
-              </CardContent>
+              <CardContent className="text-sm" />
             </Card>
 
             <div className="space-y-6">
