@@ -306,7 +306,25 @@ export function AttemptReviewPage() {
                                 />
                               </>
                             ) : (
-                              <span>{String(a.answer ?? '')}</span>
+                              <div className="text-sm">
+                                {a.answer && typeof a.answer === 'object' ? (
+                                  <>
+                                    {'note' in a.answer && a.answer.note ? (
+                                      <div className="text-gray-600">{String(a.answer.note)}</div>
+                                    ) : null}
+                                    {'originalName' in a.answer && a.answer.originalName ? (
+                                      <div>
+                                        <strong>File:</strong> {String(a.answer.originalName)}
+                                      </div>
+                                    ) : null}
+                                    <pre className="whitespace-pre-wrap text-xs text-gray-700 bg-gray-50 border rounded p-2 overflow-auto">
+                                      {JSON.stringify(a.answer, null, 2)}
+                                    </pre>
+                                  </>
+                                ) : (
+                                  <span>{String(a.answer ?? '')}</span>
+                                )}
+                              </div>
                             )}
                           </div>
                         </div>

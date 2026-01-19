@@ -490,7 +490,21 @@ export function TakeExamPage() {
                       </div>
                       {answers[q._id]?.path && (
                         <div className="text-xs text-gray-600">
-                          Uploaded: <a className="text-blue-600 hover:underline" href={answers[q._id].path} target="_blank" rel="noreferrer">{answers[q._id].originalName ?? 'image'}</a>
+                          Uploaded:{' '}
+                          <a
+                            className="text-blue-600 hover:underline"
+                            href={`${API_BASE}${answers[q._id].path}`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {answers[q._id].originalName ?? 'image'}
+                          </a>
+                          <img
+                            src={`${API_BASE}${answers[q._id].path}`}
+                            alt="Uploaded answer"
+                            className="mt-2 max-h-56 w-auto rounded border"
+                            loading="lazy"
+                          />
                         </div>
                       )}
                     </div>

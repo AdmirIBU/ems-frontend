@@ -279,7 +279,15 @@ export function StudentAttemptReviewPage() {
                         </a>
                       )
                     }
-                    return <span>{String(a.answer ?? '')}</span>
+                    if (ans && typeof ans === 'object') {
+                      return (
+                        <div className="text-xs text-gray-700">
+                          {'note' in ans && ans.note ? <div className="text-gray-600">{String(ans.note)}</div> : null}
+                          <pre className="whitespace-pre-wrap bg-gray-50 border rounded p-2 overflow-auto">{JSON.stringify(ans, null, 2)}</pre>
+                        </div>
+                      )
+                    }
+                    return <span>{String(ans ?? '')}</span>
                   }
 
                   if (q.type === 'essay') {
